@@ -4,6 +4,7 @@ import static ch.qos.logback.core.util.EnvUtil.isWindows;
 
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -12,16 +13,18 @@ import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
+import java.util.zip.ZipOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.util.FileSystemUtils;
 import org.springframework.util.LinkedMultiValueMap;
@@ -72,16 +75,24 @@ public class ImageServiceImpl implements ImageService {
                     logger.error(stdError.readLine());
 
                 }
+                MultiValueMap<String, Object> requestBody = new LinkedMultiValueMap<>();
+                requestBody.add(Constants.DATA, modelPath);
+                HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(requestBody);
+                // Create new async thread
+                CompletableFuture
+                        .supplyAsync(() -> new RestTemplate().postForObject(SEARCH_ENGINE_SERVER_URL + CommonRESTRegistry.CAPTURING_IMAGE_STATUS_RESPONSE, requestEntity, String.class));
             } catch (IOException | InterruptedException e) {
                 logger.error("Something wrong during capturing image: " + e.getMessage());
-                invalidModelPaths.add(modelPath);
+                MultiValueMap<String, Object> requestBody = new LinkedMultiValueMap<>();
+                requestBody.add(Constants.DATA, modelPath);
+                requestBody.add(Constants.ERROR, e);
+                HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(requestBody);
+                // Create new async thread
+                CompletableFuture
+                        .supplyAsync(() -> new RestTemplate().postForObject(SEARCH_ENGINE_SERVER_URL + CommonRESTRegistry.CAPTURING_IMAGE_STATUS_RESPONSE, requestEntity, String.class));
+
             }
         });
-        MultiValueMap<String, Object> requestBody = new LinkedMultiValueMap<>();
-        requestBody.add(Constants.DATA, modelPaths);
-        requestBody.add(Constants.INVALID_DATA, modelPaths);
-        HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(requestBody);
-        new RestTemplate().postForObject(SEARCH_ENGINE_SERVER_URL + CommonRESTRegistry.CAPTURING_IMAGE_STATUS_RESPONSE, requestEntity, Boolean.class);
     }
 
     private void unzip3dFolder(String modelPath) throws IOException {
@@ -110,5 +121,34 @@ public class ImageServiceImpl implements ImageService {
                 bos.close();
             }
         }
+    }
+
+    private static void zipFile(File fileToZip, String fileName, ZipOutputStream zipOut) throws IOException {
+        if (fileToZip.isHidden()) {
+            return;
+        }
+        if (fileToZip.isDirectory()) {
+            if (fileName.endsWith("/")) {
+                zipOut.putNextEntry(new ZipEntry(fileName));
+                zipOut.closeEntry();
+            } else {
+                zipOut.putNextEntry(new ZipEntry(fileName + "/"));
+                zipOut.closeEntry();
+            }
+            File[] children = fileToZip.listFiles();
+            for (File childFile : children) {
+                zipFile(childFile, fileName + "/" + childFile.getName(), zipOut);
+            }
+            return;
+        }
+        FileInputStream fis = new FileInputStream(fileToZip);
+        ZipEntry zipEntry = new ZipEntry(fileName);
+        zipOut.putNextEntry(zipEntry);
+        byte[] bytes = new byte[1024];
+        int length;
+        while ((length = fis.read(bytes)) >= 0) {
+            zipOut.write(bytes, 0, length);
+        }
+        fis.close();
     }
 }
