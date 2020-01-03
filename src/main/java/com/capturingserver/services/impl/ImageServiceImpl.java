@@ -31,6 +31,7 @@ import org.springframework.web.client.RestTemplate;
 import com.capturingserver.services.ImageService;
 import com.capturingserver.utils.CommonRESTRegistry;
 import com.capturingserver.utils.Constants;
+import com.capturingserver.utils.SCPUtils;
 
 @Service
 public class ImageServiceImpl implements ImageService {
@@ -52,7 +53,7 @@ public class ImageServiceImpl implements ImageService {
                             try {
                                 String zipWindowsPath = ROOT_FOLDER_LOCATION + modelPath.substring(modelPath.lastIndexOf(Constants.FRONT_SLASH) + 1).replace(Constants.FRONT_SLASH, Constants.BACKSLASH);
                                 String folderLinux = modelPath.substring(0, modelPath.lastIndexOf(Constants.FRONT_SLASH));
-                                com.searchengine.utils.SCPUtils.transferFromSftpServer(folderLinux, ROOT_FOLDER_LOCATION, "zip", true);
+                                SCPUtils.transferFromSftpServer(folderLinux, ROOT_FOLDER_LOCATION, "zip", true);
                                 unzip3dFolder(zipWindowsPath);
                                 String zipWindowsFolder = zipWindowsPath.substring(0, zipWindowsPath.lastIndexOf('.'));
                                 String imageFolder = zipWindowsFolder + Constants.BACKSLASH + "capturedImages";
@@ -70,7 +71,7 @@ public class ImageServiceImpl implements ImageService {
                                 }
                                 String zipPath = imageFolder + ".zip";
                                 zipDirectory(imageFolder, zipPath);
-                                com.searchengine.utils.SCPUtils.transferToSftpServer(zipPath, "/home/fusion/Desktop", true);
+                                SCPUtils.transferToSftpServer(zipPath, "/home/fusion/Desktop", false);
                                 MultiValueMap<String, Object> requestBody = new LinkedMultiValueMap<>();
                                 requestBody.add(Constants.DATA, modelPath);
                                 HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(requestBody);
