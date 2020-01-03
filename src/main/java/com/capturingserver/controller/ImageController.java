@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.capturingserver.services.ImageService;
@@ -19,7 +20,7 @@ public class ImageController {
     ImageService imageService;
 
     @PostMapping(value = CommonRESTRegistry.CAPTURING_IMAGE)
-    public ResponseEntity upload3dZipFolder(List<String> modelPaths) {
+    public ResponseEntity upload3dZipFolder(@RequestBody List<String> modelPaths) {
         imageService.handle3dZipFolder(modelPaths);
         return new ResponseEntity<>(HttpStatus.OK);
     }

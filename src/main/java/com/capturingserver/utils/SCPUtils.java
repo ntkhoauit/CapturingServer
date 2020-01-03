@@ -1,5 +1,4 @@
-package com.capturingserver.utils;
-
+package com.searchengine.utils;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -118,7 +117,7 @@ public final class SCPUtils {
                     String localFilePath = localFolderPath + File.separator + file.getFilename();
                     File localFile = new File(localFilePath);
                     if (!localFile.exists()) {
-                        String remoteFilePath = remoteFolder + File.separator + file.getFilename();
+                        String remoteFilePath = remoteFolder + "/" + file.getFilename();
                         channelSftp.get(remoteFilePath, localFilePath);
                         if (!keepFileAfterCopy) {
                             channelSftp.rm(remoteFilePath);
@@ -244,5 +243,4 @@ public final class SCPUtils {
         }
     }
 }
-
 
