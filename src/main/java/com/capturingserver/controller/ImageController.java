@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.capturingserver.services.ImageService;
 import com.capturingserver.utils.CommonRESTRegistry;
@@ -20,7 +21,8 @@ public class ImageController {
     ImageService imageService;
 
     @PostMapping(value = CommonRESTRegistry.CAPTURING_IMAGE)
-    public ResponseEntity upload3dZipFolder(@RequestBody List<String> modelPaths) {
+    public ResponseEntity upload3dZipFolder(@RequestParam("data") List<String> modelPaths) {
+        // Todo use GSON to parse string to list
         imageService.handle3dZipFolder(modelPaths);
         return new ResponseEntity<>(HttpStatus.OK);
     }

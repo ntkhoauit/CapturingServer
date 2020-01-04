@@ -32,7 +32,7 @@ public final class SCPUtils {
     private static final String SFTP_PASSWORD = "Fus10nNewC0";
 
     private SCPUtils() {
-        //To avoid initialzation.
+        //To avoid initialization.
     }
 
     private static ChannelSftp setupJsch() throws JSchException {

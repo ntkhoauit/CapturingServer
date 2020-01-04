@@ -3,13 +3,10 @@ package com.capturingserver.services.impl;
 import static ch.qos.logback.core.util.EnvUtil.isWindows;
 
 import java.io.BufferedOutputStream;
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -23,8 +20,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.util.FileSystemUtils;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
@@ -37,25 +36,25 @@ import com.capturingserver.utils.SCPUtils;
 public class ImageServiceImpl implements ImageService {
     Logger logger = LoggerFactory.getLogger(ImageServiceImpl.class);
 
-    @Value("${capturingserver.configuration.3dsCommand}")
+    @Value("${capturingserver.3dsCommand}")
     private String SERVER_3DS_COMMAND;
-    @Value("${capturingserver.configuration.rootFolderLocation}")
+    @Value("${capturingserver.rootFolderLocation}")
     private String ROOT_FOLDER_LOCATION;
-    @Value("${searchengine.serverUrl}")
+    @Value("${remoteserver.serverUrl}")
     private String SEARCH_ENGINE_SERVER_URL;
-
+    @Value("${remoteserver.rootFolderLocation}")
+    private String REMOTE_ROOT_FOLDER_LOCATION;
 
     @Override
     public void handle3dZipFolder(List<String> modelPaths) {
-        List<String> invalidModelPaths = new ArrayList<>();
         modelPaths.forEach(modelPath -> CompletableFuture
                 .supplyAsync(() -> {
                             try {
-                                String zipWindowsPath = ROOT_FOLDER_LOCATION + modelPath.substring(modelPath.lastIndexOf(Constants.FRONT_SLASH) + 1).replace(Constants.FRONT_SLASH, Constants.BACKSLASH);
-                                String folderLinux = modelPath.substring(0, modelPath.lastIndexOf(Constants.FRONT_SLASH));
+                                String zipWindowsFolder = ROOT_FOLDER_LOCATION + modelPath;
+                                String folderLinux = REMOTE_ROOT_FOLDER_LOCATION + modelPath;
                                 SCPUtils.transferFromSftpServer(folderLinux, ROOT_FOLDER_LOCATION, "zip", true);
-                                unzip3dFolder(zipWindowsPath);
-                                String zipWindowsFolder = zipWindowsPath.substring(0, zipWindowsPath.lastIndexOf('.'));
+                                unzip3dFolder(zipWindowsFolder + ".zip");
+
                                 String imageFolder = zipWindowsFolder + Constants.BACKSLASH + "capturedImages";
                                 ProcessBuilder builder = new ProcessBuilder().redirectErrorStream(true);
                                 String command = SERVER_3DS_COMMAND + " -mxsString root:\"" + zipWindowsFolder.replace("\\","\\\\")
@@ -71,16 +70,19 @@ public class ImageServiceImpl implements ImageService {
                                 }
                                 String zipPath = imageFolder + ".zip";
                                 zipDirectory(imageFolder, zipPath);
-                                SCPUtils.transferToSftpServer(zipPath, "/home/fusion/Desktop", false);
+                                SCPUtils.transferToSftpServer(zipPath, folderLinux, false);
                                 MultiValueMap<String, Object> requestBody = new LinkedMultiValueMap<>();
                                 requestBody.add(Constants.DATA, modelPath);
                                 HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(requestBody);
-                                new RestTemplate().postForObject(SEARCH_ENGINE_SERVER_URL + CommonRESTRegistry.CAPTURING_IMAGE_STATUS_RESPONSE, requestEntity, String.class);
-                            } catch (IOException | InterruptedException e) {
+                                ResponseEntity<String> responseEntity = new RestTemplate().exchange(SEARCH_ENGINE_SERVER_URL + CommonRESTRegistry.CAPTURING_IMAGE_STATUS_RESPONSE, HttpMethod.POST, requestEntity, String.class);
+                                if(responseEntity.getStatusCode() != HttpStatus.OK) {
+                                    throw new InterruptedException("Something wrong during response sending");
+                                }
+                            } catch (Throwable e) {
                                 logger.error("Something wrong during capturing image: " + e.getMessage());
                                 MultiValueMap<String, Object> requestBody = new LinkedMultiValueMap<>();
                                 requestBody.add(Constants.DATA, modelPath);
-                                requestBody.add(Constants.ERROR, e);
+                                requestBody.add(Constants.ERROR, e.getMessage());
                                 HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(requestBody);
                                 new RestTemplate().postForObject(SEARCH_ENGINE_SERVER_URL + CommonRESTRegistry.CAPTURING_IMAGE_STATUS_RESPONSE, requestEntity, String.class);
                             }
@@ -120,6 +122,7 @@ public class ImageServiceImpl implements ImageService {
             }
         }
         zipInputStream.close();
+        Files.delete(Paths.get(modelPath));
     }
 
 
@@ -143,6 +146,8 @@ public class ImageServiceImpl implements ImageService {
                 }
             }
 
+        } catch(Exception e) {
+            System.err.println(e);
         }
     }
 
