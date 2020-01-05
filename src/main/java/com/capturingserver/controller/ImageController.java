@@ -1,5 +1,6 @@
 package com.capturingserver.controller;
 
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.capturingserver.services.ImageService;
 import com.capturingserver.utils.CommonRESTRegistry;
+import com.google.gson.Gson;
 
 @CrossOrigin(origins = "*", maxAge = 360000)
 @RestController
@@ -21,9 +23,9 @@ public class ImageController {
     ImageService imageService;
 
     @PostMapping(value = CommonRESTRegistry.CAPTURING_IMAGE)
-    public ResponseEntity upload3dZipFolder(@RequestParam("data") List<String> modelPaths) {
-        // Todo use GSON to parse string to list
-        imageService.handle3dZipFolder(modelPaths);
+    public ResponseEntity upload3dZipFolder(@RequestParam("data") String modelPathsString) {
+        List<String> modelPathList = new Gson().fromJson(modelPathsString, List.class);
+        imageService.handle3dZipFolder(modelPathList);
         return new ResponseEntity<>(HttpStatus.OK);
     }
 }

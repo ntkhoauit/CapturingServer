@@ -16,6 +16,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
+import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -48,17 +49,20 @@ public class ImageServiceImpl implements ImageService {
     @Override
     public void handle3dZipFolder(List<String> modelPaths) {
         modelPaths.forEach(modelPath -> CompletableFuture
+                .supplyAsync(() -> { System.err.println(modelPath); return null; }));
+        modelPaths.forEach(modelPath -> CompletableFuture
                 .supplyAsync(() -> {
                             try {
-                                String zipWindowsFolder = ROOT_FOLDER_LOCATION + modelPath;
-                                String folderLinux = REMOTE_ROOT_FOLDER_LOCATION + modelPath;
-                                SCPUtils.transferFromSftpServer(folderLinux, ROOT_FOLDER_LOCATION, "zip", true);
-                                unzip3dFolder(zipWindowsFolder + ".zip");
+                                String localModelFolderPath = ROOT_FOLDER_LOCATION + modelPath;
+                                String remoteModelFolderPath = REMOTE_ROOT_FOLDER_LOCATION + modelPath;
+                                String remoteModelFileNamePath = remoteModelFolderPath + Constants.FRONT_SLASH + modelPath;
+                                SCPUtils.transferFileFromSftpServer(remoteModelFileNamePath, ROOT_FOLDER_LOCATION, "zip", true);
+                                unzip3dFolder(localModelFolderPath + ".zip");
 
-                                String imageFolder = zipWindowsFolder + Constants.BACKSLASH + "capturedImages";
+                                String capturedImageFolderPath = localModelFolderPath + Constants.BACKSLASH + "capturedImages";
                                 ProcessBuilder builder = new ProcessBuilder().redirectErrorStream(true);
-                                String command = SERVER_3DS_COMMAND + " -mxsString root:\"" + zipWindowsFolder.replace("\\","\\\\")
-                                        + "\" -mxsString baseFolder:\"" + imageFolder.replace("\\","\\\\") + "\" -listenerLog \"test.log\"";
+                                String command = SERVER_3DS_COMMAND + " -mxsString root:\"" + localModelFolderPath.replace("\\","\\\\")
+                                        + "\" -mxsString baseFolder:\"" + capturedImageFolderPath.replace("\\","\\\\") + "\" -listenerLog \"test.log\"";
                                 if (isWindows()) {
                                     builder.command("cmd.exe", "/c", command);
                                 }
@@ -68,9 +72,10 @@ public class ImageServiceImpl implements ImageService {
                                 if (exitCode != 0) {
                                     throw new InterruptedException("Cannot capture 3d model");
                                 }
-                                String zipPath = imageFolder + ".zip";
-                                zipDirectory(imageFolder, zipPath);
-                                SCPUtils.transferToSftpServer(zipPath, folderLinux, false);
+                                String zipPath = capturedImageFolderPath + ".zip";
+                                zipDirectory(capturedImageFolderPath, zipPath);
+                                SCPUtils.transferToSftpServer(zipPath, remoteModelFolderPath, false);
+                                FileUtils.deleteDirectory(new File(localModelFolderPath));
                                 MultiValueMap<String, Object> requestBody = new LinkedMultiValueMap<>();
                                 requestBody.add(Constants.DATA, modelPath);
                                 HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(requestBody);
@@ -145,10 +150,8 @@ public class ImageServiceImpl implements ImageService {
                     System.err.println(e);
                 }
             }
-
-        } catch(Exception e) {
-            System.err.println(e);
         }
+
     }
 
     private void createFolder(String serverPath) {

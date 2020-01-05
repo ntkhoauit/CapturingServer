@@ -92,6 +92,50 @@ public final class SCPUtils {
             e.printStackTrace();
         }
     }
+
+    public static void transferFileFromSftpServer(String remoteFilePath, String localFolderPath,
+                                              String fileExtensionToTransfer,
+                                              boolean keepFileAfterCopy) throws FileNotFoundException {
+        ChannelSftp channelSftp = null;
+        String remoteFilePathWithExtension = remoteFilePath + FilenameUtils.EXTENSION_SEPARATOR + fileExtensionToTransfer;
+        String localFileWithExtensionPath = localFolderPath + FilenameUtils.getName(remoteFilePath) + FilenameUtils.EXTENSION_SEPARATOR + fileExtensionToTransfer;
+
+        try {
+            channelSftp = setupJsch();
+
+            File localFile = new File(localFileWithExtensionPath);
+            if (!localFile.exists()) {
+                channelSftp.get(remoteFilePathWithExtension , localFileWithExtensionPath);
+                if (!keepFileAfterCopy) {
+                    channelSftp.rm(remoteFilePath);
+                }
+            } else {
+                String message =
+                        "Problem when transfering file " + remoteFilePathWithExtension +
+                                "  from sftp due to file already existed in " + localFolderPath;
+                logger.error(message);
+                throw new RuntimeException(message);
+            }
+
+        } catch (JSchException e) {
+            String message =
+                    "Problem while creating session to connect SFTP " + remoteFilePathWithExtension + e.getMessage();
+            logger.error(message, e);
+            throw new RuntimeException(message, e);
+        } catch (SftpException e) {
+            String message = "Problem while connecting to " + remoteFilePathWithExtension + " " + e.getMessage();
+            logger.error(message, e);
+            throw new RuntimeException(message, e);
+        } catch (Exception e) {
+            String message =
+                    "Problem while doing transfer from sftp " + remoteFilePathWithExtension + " to local " + localFolderPath + " " +
+                            e.getMessage();
+            logger.error(message, e);
+            throw new RuntimeException(message, e);
+        } finally {
+            closeAllConnections(channelSftp);
+        }
+    }
     /**
      * Transfer all contents of a remote folder path to local
      * @param remoteFolderPath
@@ -164,7 +208,9 @@ public final class SCPUtils {
             File sourceFile = new File(localPath);
             channelSftp.cd(remoteFolderPath);
             if (sourceFile.isFile()) {
-                channelSftp.put(new FileInputStream(sourceFile), sourceFile.getName());
+                FileInputStream fis = new FileInputStream(sourceFile);
+                channelSftp.put(fis, sourceFile.getName());
+                fis.close();
                 if (!keepFileAfterCopy) {
                     FileUtils.deleteQuietly(sourceFile);
                 }
