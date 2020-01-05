@@ -17,6 +17,8 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,6 +34,7 @@ import com.capturingserver.services.ImageService;
 import com.capturingserver.utils.CommonRESTRegistry;
 import com.capturingserver.utils.Constants;
 import com.capturingserver.utils.SCPUtils;
+import com.google.common.base.Strings;
 
 @Service
 public class ImageServiceImpl implements ImageService {
@@ -54,10 +57,14 @@ public class ImageServiceImpl implements ImageService {
                                 String localModelFolderPath = ROOT_FOLDER_LOCATION + modelPath;
                                 String remoteModelFolderPath = REMOTE_ROOT_FOLDER_LOCATION + modelPath;
                                 String remoteModelFileNamePath = remoteModelFolderPath + Constants.FRONT_SLASH + modelPath;
-                                SCPUtils.transferFileFromSftpServer(remoteModelFileNamePath, ROOT_FOLDER_LOCATION, "zip", true);
-                                unzip3dFolder(localModelFolderPath + ".zip");
-
                                 String capturedImageFolderPath = localModelFolderPath + Constants.BACKSLASH + "capturedImages";
+                                FileUtils.deleteDirectory(new File(localModelFolderPath));
+                                Path localModelFolderZipPath = Paths.get(localModelFolderPath + FilenameUtils.EXTENSION_SEPARATOR + Constants.ZIP_EXTENSION);
+                                if(Files.exists(localModelFolderZipPath)){
+                                    Files.delete(localModelFolderZipPath);
+                                }
+                                SCPUtils.transferFileFromSftpServer(remoteModelFileNamePath, ROOT_FOLDER_LOCATION, Constants.ZIP_EXTENSION, true);
+                                unzip3dFolder(localModelFolderPath + FilenameUtils.EXTENSION_SEPARATOR + Constants.ZIP_EXTENSION);
                                 ProcessBuilder builder = new ProcessBuilder().redirectErrorStream(true);
                                 String command = SERVER_3DS_COMMAND + " -mxsString root:\"" + localModelFolderPath.replace("\\","\\\\")
                                         + "\" -mxsString baseFolder:\"" + capturedImageFolderPath.replace("\\","\\\\") + "\" -listenerLog \"test.log\"";
@@ -67,10 +74,14 @@ public class ImageServiceImpl implements ImageService {
                                 Process process = builder.start();
 
                                 int exitCode = process.waitFor();
+                                System.err.println("result: " + (exitCode != 0));
                                 if (exitCode != 0) {
-                                    throw new InterruptedException("Cannot capture 3d model");
+                                    System.err.println("result: " + (exitCode != -130));
+                                    if(exitCode != -130) {
+                                        throw new InterruptedException("Cannot capture 3d model ! Exit code=" + exitCode);
+                                    }
                                 }
-                                String zipPath = capturedImageFolderPath + ".zip";
+                                String zipPath = capturedImageFolderPath + FilenameUtils.EXTENSION_SEPARATOR + Constants.ZIP_EXTENSION;
                                 zipDirectory(capturedImageFolderPath, zipPath);
                                 SCPUtils.transferToSftpServer(zipPath, remoteModelFolderPath, false);
                                 FileUtils.deleteDirectory(new File(localModelFolderPath));
@@ -95,8 +106,6 @@ public class ImageServiceImpl implements ImageService {
     }
 
     private void unzip3dFolder(String modelPath) throws IOException {
-        byte[] buffer = new byte[1024];
-        int bufferSize = 1024;
         ZipInputStream zipInputStream = new ZipInputStream(new FileInputStream(modelPath));
         String extractedModelDirectory = modelPath.substring(0, modelPath.lastIndexOf('.'));
         Files.createDirectories(Paths.get(extractedModelDirectory));
@@ -113,15 +122,19 @@ public class ImageServiceImpl implements ImageService {
                     createFolder(extractedModelDirectory + Constants.BACKSLASH + Paths.get(entryName).getParent());
                 }
                 String uncompressedFilename = extractedModelDirectory + Constants.BACKSLASH + entryName;
+                uncompressedFilename = StringUtils.replace(uncompressedFilename, Constants.BLANK_SPACE, Constants.UNDERSCORE);
                 Files.createFile(Paths.get(uncompressedFilename));
-                FileOutputStream fos = new FileOutputStream(uncompressedFilename);
-                BufferedOutputStream bos = new BufferedOutputStream(fos, bufferSize);
-                int count;
-                while ((count = zipInputStream.read(buffer, 0, bufferSize)) != -1) {
-                    bos.write(buffer, 0, count);
+                try(FileOutputStream fos = new FileOutputStream(uncompressedFilename)) {
+                    int bufferSize = 1024;
+                    try (BufferedOutputStream bos = new BufferedOutputStream(fos, bufferSize)) {
+                        int count;
+                        byte[] buffer = new byte[1024];
+                        while ((count = zipInputStream.read(buffer, 0, bufferSize)) != -1) {
+                            bos.write(buffer, 0, count);
+                        }
+                        bos.flush();
+                    }
                 }
-                bos.flush();
-                bos.close();
             }
         }
         zipInputStream.close();
@@ -145,7 +158,7 @@ public class ImageServiceImpl implements ImageService {
                     zipOutputStream.write(Files.readAllBytes(Paths.get(path)));
                     zipOutputStream.closeEntry();
                 } catch (Exception e) {
-                    System.err.println(e);
+                    throw e;
                 }
             }
         }

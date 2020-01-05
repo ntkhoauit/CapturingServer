@@ -5,4 +5,7 @@ public class Constants {
     public static final String ERROR = "error";
     public static final String BACKSLASH = "\\";
     public static final String FRONT_SLASH = "/";
+    public static final String BLANK_SPACE = " ";
+    public static final String UNDERSCORE = "_";
+    public static final String ZIP_EXTENSION = "zip";
 }
