@@ -105,37 +105,36 @@ fn load_texture root =
 
 setVRaySilentMode()
 makeDir baseFolder
- for f in files do (
-	loadMAXFile f useFileUnits:true quiet:true
-	viewport.ResetAllViews()
-	displaySafeFrames = true
+for f in files do (
+    loadMAXFile f useFileUnits:true quiet:true
+    viewport.ResetAllViews()
+    displaySafeFrames = true
 
-	max tool maximize
-	viewport.setGridVisibility #all false
-	actionMan.executeAction 0 "550"
-	viewport.SetShowEdgeFaces false
-	viewport.EnableSolidBackgroundColorMode true
-	filepath = getFilenamePath f
-	filename = getFilenameFile f
-	theAxis = (viewport.getTM()).row3
-	newFolder = filepath + filename
+    max tool maximize
+    viewport.setGridVisibility #all false
+    actionMan.executeAction 0 "550"
+    viewport.SetShowEdgeFaces false
+    viewport.EnableSolidBackgroundColorMode true
+    filepath = getFilenamePath f
+    filename = getFilenameFile f
+    theAxis = (viewport.getTM()).row3
+    newFolder = filepath + filename
 
-	theName = getfilenamepath filepath
+    theName = getfilenamepath filepath
 
-	bMaps = getClassInstances Bitmaptexture
+    bMaps = getClassInstances Bitmaptexture
 
-	folder3dpath = theName
-	print ("folder path " + folder3dpath)
-	--load texture
-	files = load_texture folder3dpath
-	for matClass in material.classes do (
+    folder3dpath = theName
+    print ("folder path " + folder3dpath)
+    --load texture
+    files = load_texture folder3dpath
+    for matClass in material.classes do (
         for m in (getclassinstances matClass processChildren:true) do (
             if (refs.dependentNodes m).count>0 then (
                 if classof m != Multimaterial then showTexturemap m on
             )
         )
     )
-
 
     if files.count != 0
     then (
@@ -169,7 +168,7 @@ makeDir baseFolder
         )
     )
 
-	i = 1
+    i = 1
     for i = 1 to 12 do
     (
         tempFolder = newFolder + "_" + i as string

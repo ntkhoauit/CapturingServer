@@ -49,8 +49,6 @@ public class ImageServiceImpl implements ImageService {
     @Override
     public void handle3dZipFolder(List<String> modelPaths) {
         modelPaths.forEach(modelPath -> CompletableFuture
-                .supplyAsync(() -> { System.err.println(modelPath); return null; }));
-        modelPaths.forEach(modelPath -> CompletableFuture
                 .supplyAsync(() -> {
                             try {
                                 String localModelFolderPath = ROOT_FOLDER_LOCATION + modelPath;
