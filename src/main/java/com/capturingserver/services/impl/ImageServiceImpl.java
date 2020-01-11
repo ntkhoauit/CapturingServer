@@ -7,7 +7,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -22,6 +21,7 @@ import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
@@ -32,13 +32,15 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 import com.capturingserver.services.ImageService;
+import com.capturingserver.services.SCPService;
 import com.capturingserver.utils.CommonRESTRegistry;
 import com.capturingserver.utils.Constants;
-import com.capturingserver.utils.SCPUtils;
 
 @Service
 public class ImageServiceImpl implements ImageService {
     Logger logger = LoggerFactory.getLogger(ImageServiceImpl.class);
+    @Autowired
+    private SCPService scpService;
 
     @Value("${capturingserver.3dsCommand}")
     private String SERVER_3DS_COMMAND;
@@ -63,7 +65,7 @@ public class ImageServiceImpl implements ImageService {
                                 if(Files.exists(localModelFolderZipPath)){
                                     Files.delete(localModelFolderZipPath);
                                 }
-                                SCPUtils.transferFileFromSftpServer(remoteModelFileNamePath, ROOT_FOLDER_LOCATION, Constants.ZIP_EXTENSION, true);
+                                scpService.transferFileFromSftpServer(remoteModelFileNamePath, ROOT_FOLDER_LOCATION, Constants.ZIP_EXTENSION, true);
                                 unzip3dFolder(localModelFolderPath + FilenameUtils.EXTENSION_SEPARATOR + Constants.ZIP_EXTENSION);
                                 ProcessBuilder builder = new ProcessBuilder().redirectErrorStream(true);
                                 String command = SERVER_3DS_COMMAND + " -mxsString root:\"" + localModelFolderPath.replace("\\","\\\\")
@@ -83,7 +85,7 @@ public class ImageServiceImpl implements ImageService {
                                 }
                                 String zipPath = capturedImageFolderPath + FilenameUtils.EXTENSION_SEPARATOR + Constants.ZIP_EXTENSION;
                                 zipDirectory(capturedImageFolderPath, zipPath);
-                                SCPUtils.transferToSftpServer(zipPath, remoteModelFolderPath, false);
+                                scpService.transferToSftpServer(zipPath, remoteModelFolderPath, false);
                                 FileUtils.deleteDirectory(new File(localModelFolderPath));
                                 MultiValueMap<String, Object> requestBody = new LinkedMultiValueMap<>();
                                 requestBody.add(Constants.DATA, modelPath);
