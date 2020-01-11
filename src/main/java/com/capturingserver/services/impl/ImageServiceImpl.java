@@ -7,10 +7,11 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.zip.ZipEntry;
@@ -34,7 +35,6 @@ import com.capturingserver.services.ImageService;
 import com.capturingserver.utils.CommonRESTRegistry;
 import com.capturingserver.utils.Constants;
 import com.capturingserver.utils.SCPUtils;
-import com.google.common.base.Strings;
 
 @Service
 public class ImageServiceImpl implements ImageService {
@@ -105,6 +105,7 @@ public class ImageServiceImpl implements ImageService {
                 ));
     }
 
+
     private void unzip3dFolder(String modelPath) throws IOException {
         ZipInputStream zipInputStream = new ZipInputStream(new FileInputStream(modelPath));
         String extractedModelDirectory = modelPath.substring(0, modelPath.lastIndexOf('.'));
@@ -116,10 +117,7 @@ public class ImageServiceImpl implements ImageService {
             } else {
                 String entryName = entry.getName();
                 if (Paths.get(entryName).getParent() != null) {
-                    if (Paths.get(entryName).getParent().getParent() != null) {
-                        createFolder(extractedModelDirectory + Constants.BACKSLASH + Paths.get(entryName).getParent().getParent());
-                    }
-                    createFolder(extractedModelDirectory + Constants.BACKSLASH + Paths.get(entryName).getParent());
+                    createFolderRecursively(extractedModelDirectory + Constants.BACKSLASH + Paths.get(entryName).getParent());
                 }
                 String uncompressedFilename = extractedModelDirectory + Constants.BACKSLASH + entryName;
                 uncompressedFilename = StringUtils.replace(uncompressedFilename, Constants.BLANK_SPACE, Constants.UNDERSCORE);
@@ -145,30 +143,35 @@ public class ImageServiceImpl implements ImageService {
     public static void zipDirectory(String sourceDirectoryPath, String zipPath) throws IOException {
 
         Path zipFilePath = Files.createFile(Paths.get(zipPath));
+        try(OutputStream outputStream = Files.newOutputStream(zipFilePath)) {
+            try (ZipOutputStream zipOutputStream = new ZipOutputStream(outputStream)) {
+                File dir = new File(sourceDirectoryPath);
 
-        try (ZipOutputStream zipOutputStream = new ZipOutputStream(Files.newOutputStream(zipFilePath))) {
-            File dir = new File(sourceDirectoryPath);
-
-            String[] files = dir.list();
-            for (String file: files){
-                String path = sourceDirectoryPath + Constants.BACKSLASH + file;
-                ZipEntry zipEntry = new ZipEntry(file);
-                try {
-                    zipOutputStream.putNextEntry(zipEntry);
-                    zipOutputStream.write(Files.readAllBytes(Paths.get(path)));
-                    zipOutputStream.closeEntry();
-                } catch (Exception e) {
-                    throw e;
+                String[] files = dir.list();
+                for (String file : files) {
+                    String path = sourceDirectoryPath + Constants.BACKSLASH + file;
+                    ZipEntry zipEntry = new ZipEntry(file);
+                    try {
+                        zipOutputStream.putNextEntry(zipEntry);
+                        zipOutputStream.write(Files.readAllBytes(Paths.get(path)));
+                        zipOutputStream.closeEntry();
+                    } catch (Exception e) {
+                        throw e;
+                    }
                 }
             }
         }
 
     }
 
-    private void createFolder(String serverPath) {
+    private void createFolderRecursively(String serverPath) {
         File newFolder = new File(serverPath);
-        if (!newFolder.exists()) {
-            newFolder.mkdirs();
+        if (!newFolder.getParentFile().exists()) {
+            createFolderRecursively(newFolder.getParentFile().getPath());
+        }else{
+            if(!newFolder.exists()) {
+                newFolder.mkdirs();
+            }
         }
     }
 }
