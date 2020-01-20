@@ -8,4 +8,5 @@ public class Constants {
     public static final String BLANK_SPACE = " ";
     public static final String UNDERSCORE = "_";
     public static final String ZIP_EXTENSION = "zip";
+    public static final String CAPTURED_IMAGES_FOLDER = "capturedImages";
 }
